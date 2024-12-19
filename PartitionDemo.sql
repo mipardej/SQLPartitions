@@ -1,16 +1,18 @@
+USE PartitionDemo2
+
 -- Step 1: Create the Partition Function
 -- Partition function divides data into ranges based on the datetime column.
 CREATE PARTITION FUNCTION DateTimePartitionFunction (DATETIME)
 AS RANGE RIGHT FOR VALUES
-    ('2023-01-01T00:00:00',  -- Partition 1: data before or equal to this date
-     '2024-01-01T00:00:00',  -- Partition 2: data between this date and the next
-     '2025-01-01T00:00:00'); -- Partition 3: data after this date
+    ('2022-01-01T00:00:00',
+	 '2023-01-01T00:00:00',  
+     '2024-01-01T00:00:00'); 
 
 -- Step 2: Create the Partition Schema
 -- The schema specifies the filegroups where each partition will be stored.
 CREATE PARTITION SCHEME DateTimePartitionScheme
 AS PARTITION DateTimePartitionFunction
-TO ([PRIMARY],[FG2022], [FG2023], [FG2024]); -- Filegroups where the partitions will be placed
+TO ([FG2022], [FG2022], [FG2023], [FG2024]); -- Filegroups where the partitions will be placed
 
 -- Step 3: Create the Table
 -- The table will have multiple columns, one of which is a DATETIME column.
@@ -44,14 +46,6 @@ WHERE SalesDate = '2023-05-01';
 
 
 
-
-USE [master]
-GO
-ALTER DATABASE [PartitionDemo1] ADD FILE ( NAME = N'PartitionDemo1_2024', FILENAME = N'/var/opt/mssql/data/PartitionDemo1_2024.ndf' , SIZE = 8192KB , FILEGROWTH = 65536KB ) TO FILEGROUP [FG2024]
-GO
-ALTER DATABASE [PartitionDemo1] ADD FILE ( NAME = N'PartitionDemo1_2025', FILENAME = N'/var/opt/mssql/data/PartitionDemo1_2025.ndf' , SIZE = 8192KB , FILEGROWTH = 65536KB ) TO FILEGROUP [FG2025]
-GO
-
 SELECT $PARTITION.DateTimePartitionFunction(SalesDate) AS PartitionID, *
 FROM SalesData
 -- Query to show the number of rows in each partition of the SalesData table
@@ -75,5 +69,14 @@ GROUP BY
 ORDER BY 
     p.partition_number;
 
+USE [master]
+GO
+ALTER DATABASE [PartitionDemo1] ADD FILEGROUP [FG2025]
+GO
+ALTER DATABASE [PartitionDemo1] 
+ADD FILE ( NAME = N'PartitionDemo1_2025', FILENAME = N'D:\MSSQL\Data\PartitionDemo2_2025.ndf' ) TO FILEGROUP [FG2025]
+GO
 
-select * from sys.filegroups
+
+ALTER PARTITION SCHEME [DateTimePartitionScheme] NEXT USED [FG2025]
+ALTER PARTITION FUNCTION [DateTimePartitionFunction] () SPLIT RANGE ('2025-01-01 00:00:00')
